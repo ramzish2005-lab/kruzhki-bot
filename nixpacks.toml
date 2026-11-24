@@ -1,0 +1,5 @@
+# Nixpacks: Python 3.12, зависимости ставятся из requirements.txt.
+# Стартовая команда задана в railway.json.
+
+[phases.setup]
+nixPkgs = ["python312"]

@@ -7,4 +7,5 @@ data/
 *.db-shm
 *.session
 .env
+railway_vars.txt
 .ruff_cache/

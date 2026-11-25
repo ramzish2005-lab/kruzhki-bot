@@ -3,34 +3,24 @@
 from __future__ import annotations
 
 from aiogram import Bot
-from aiogram.exceptions import TelegramAPIError
 from aiogram.types import CallbackQuery, Message, User as TgUser
 
-from .. import texts
 from ..config import Config
 from ..db import Database, User
-from ..keyboards import (
-    no_views_gate,
-    reply_menu,
-    sponsor_gate,
-    sub_gate,
-)
+from ..keyboards import reply_menu
 from ..services.access import Gate, resolve_gate
+from ..services.gates import price_label, send_gate
 
-
-def price_label(cfg: Config) -> str:
-    if cfg.payment_mode == "provider":
-        return f"{cfg.pay_pack_rub} ₽"
-    return f"{cfg.pay_pack_stars} ⭐"
-
-
-async def _reachable(bot: Bot, chat_id: int) -> bool:
-    """Доступен ли канал боту (существует и бот его видит)."""
-    try:
-        await bot.get_chat(chat_id)
-    except TelegramAPIError:
-        return False
-    return True
+__all__ = [
+    "ensure_user",
+    "gate_for",
+    "menu_for",
+    "price_label",
+    "require_access_callback",
+    "require_access_message",
+    "send_gate",
+    "status_text",
+]
 
 
 async def ensure_user(from_user: TgUser, db: Database, cfg: Config) -> User:
@@ -42,48 +32,6 @@ async def ensure_user(from_user: TgUser, db: Database, cfg: Config) -> User:
         free_views=cfg.free_views,
     )
     return user
-
-
-async def send_gate(
-    bot: Bot, chat_id: int, cfg: Config, gate: Gate
-) -> None:
-    """Показывает пользователю, что нужно сделать для доступа."""
-    if gate is Gate.MAIN_SUB:
-        await bot.send_message(
-            chat_id,
-            texts.GATE_SUB_REQUIRED,
-            reply_markup=sub_gate(cfg.main_channel_url),
-            disable_web_page_preview=True,
-        )
-    elif gate is Gate.SPONSORS:
-        sponsors = [
-            (sponsor.title, sponsor.url)
-            for sponsor in cfg.sponsors
-            if await _reachable(bot, sponsor.chat_id)
-        ]
-        if not sponsors:
-            await bot.send_message(chat_id, texts.ERROR)
-            return
-        await bot.send_message(
-            chat_id,
-            texts.GATE_SPONSORS_REQUIRED.format(bonus=cfg.bonus_views, left=len(sponsors)),
-            reply_markup=sponsor_gate(sponsors, cfg.bonus_views),
-            disable_web_page_preview=True,
-        )
-    elif gate is Gate.PAYMENT:
-        await bot.send_message(
-            chat_id,
-            texts.GATE_NO_VIEWS.format(
-                referral=cfg.referral_views,
-                size=cfg.pay_pack_size,
-                price=price_label(cfg),
-            ),
-            reply_markup=no_views_gate(
-                cfg.pay_pack_size, price_label(cfg), cfg.referral_views
-            ),
-        )
-    else:
-        await bot.send_message(chat_id, texts.ERROR)
 
 
 async def gate_for(from_user: TgUser, bot: Bot, db: Database, cfg: Config) -> tuple[User, Gate]:

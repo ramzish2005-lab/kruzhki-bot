@@ -15,7 +15,18 @@ from aiogram.utils.callback_answer import CallbackAnswerMiddleware
 
 from bot.config import Config, ConfigError, load_config
 from bot.db import Database
-from bot.handlers import admin, feed, ingest, moderation, payments, sponsors, start, submit
+from bot.handlers import (
+    admin,
+    feed,
+    ingest,
+    moderation,
+    payments,
+    settings as settings_handler,
+    sponsors,
+    start,
+    submit,
+)
+from bot.settings import load_settings
 
 log = logging.getLogger(__name__)
 
@@ -51,6 +62,7 @@ def build_dispatcher(cfg: Config, db: Database) -> Dispatcher:
 
     # Порядок важен: админ/модерация раньше пользовательских хендлеров.
     dp.include_router(admin.router)
+    dp.include_router(settings_handler.router)
     dp.include_router(moderation.router)
     dp.include_router(payments.router)
     dp.include_router(sponsors.router)
@@ -103,6 +115,16 @@ async def main() -> None:
     db = Database(cfg.db_path)
     await db.connect()
     log.info("База данных: %s", cfg.db_path)
+
+    applied = await load_settings(db, cfg)
+    if applied:
+        log.info("Настройки из базы: %s", ", ".join(applied))
+    log.info(
+        "Тариф: %s бесплатных, пакет %s за %s ⭐",
+        cfg.free_views,
+        cfg.pay_pack_size,
+        cfg.pay_pack_stars,
+    )
 
     bot = Bot(
         token=cfg.bot_token,

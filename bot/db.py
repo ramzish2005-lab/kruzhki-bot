@@ -83,6 +83,13 @@ CREATE TABLE IF NOT EXISTS sponsor_checks (
     checked_at TEXT NOT NULL,
     PRIMARY KEY (user_id, sponsor_id)
 );
+
+CREATE TABLE IF NOT EXISTS settings (
+    key        TEXT PRIMARY KEY,
+    value      TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    updated_by INTEGER
+);
 """
 
 
@@ -448,6 +455,33 @@ class Database:
             "ON CONFLICT(user_id, sponsor_id) DO UPDATE SET checked_at = excluded.checked_at",
             (user_id, sponsor_id, iso()),
         )
+        await self.conn.commit()
+
+    # --------------------------------------------------------------- settings
+
+    async def get_setting(self, key: str) -> str | None:
+        async with self.conn.execute(
+            "SELECT value FROM settings WHERE key = ?", (key,)
+        ) as cur:
+            row = await cur.fetchone()
+        return row["value"] if row else None
+
+    async def get_settings(self) -> dict[str, str]:
+        async with self.conn.execute("SELECT key, value FROM settings") as cur:
+            rows = await cur.fetchall()
+        return {row["key"]: row["value"] for row in rows}
+
+    async def set_setting(self, key: str, value: str, admin_id: int | None = None) -> None:
+        await self.conn.execute(
+            "INSERT INTO settings (key, value, updated_at, updated_by) VALUES (?, ?, ?, ?) "
+            "ON CONFLICT(key) DO UPDATE SET value = excluded.value, "
+            "updated_at = excluded.updated_at, updated_by = excluded.updated_by",
+            (key, value, iso(), admin_id),
+        )
+        await self.conn.commit()
+
+    async def delete_setting(self, key: str) -> None:
+        await self.conn.execute("DELETE FROM settings WHERE key = ?", (key,))
         await self.conn.commit()
 
     # ------------------------------------------------------------------ stats

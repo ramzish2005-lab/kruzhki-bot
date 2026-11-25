@@ -34,6 +34,11 @@ class PayCB(CallbackData, prefix="pay"):
     size: int
 
 
+class SettingsCB(CallbackData, prefix="set"):
+    action: str  # edit | reset | close
+    key: str = ""
+
+
 class SponsorCB(CallbackData, prefix="sponsor"):
     index: int
 
@@ -53,6 +58,7 @@ def reply_menu(is_admin: bool = False) -> ReplyKeyboardMarkup:
         [KeyboardButton(text="📤 Отправить кружок"), KeyboardButton(text="📊 Мои просмотры")],
     ]
     if is_admin:
+        rows.append([KeyboardButton(text="⚙️ Настройки")])
         rows.append([KeyboardButton(text="📈 Статистика")])
     return ReplyKeyboardMarkup(keyboard=rows, resize_keyboard=True)
 
@@ -121,4 +127,28 @@ def moderation_kb(item_id: int) -> InlineKeyboardMarkup:
 def back_to_menu() -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     builder.button(text="⬅️ В меню", callback_data=MenuCB(action="status").pack())
+    return builder.as_markup()
+
+
+def settings_panel(rows: list[tuple[str, str, str]]) -> InlineKeyboardMarkup:
+    """rows: (key, label, formatted_value)."""
+    builder = InlineKeyboardBuilder()
+    for key, label, value in rows:
+        builder.row(
+            InlineKeyboardButton(
+                text=f"{label}: {value}",
+                callback_data=SettingsCB(action="edit", key=key).pack(),
+            )
+        )
+    builder.row(
+        InlineKeyboardButton(
+            text="🔄 Сбросить всё к значениям из .env",
+            callback_data=SettingsCB(action="reset").pack(),
+        )
+    )
+    builder.row(
+        InlineKeyboardButton(
+            text="✖️ Закрыть", callback_data=SettingsCB(action="close").pack()
+        )
+    )
     return builder.as_markup()

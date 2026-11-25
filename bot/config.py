@@ -25,8 +25,13 @@ class Sponsor:
     title: str
 
 
-@dataclass(frozen=True)
+@dataclass
 class Config:
+    """Настройки бота.
+
+    Не frozen: часть значений (лимиты, цены) админ меняет прямо в Telegram,
+    и изменения должны действовать сразу, без перезапуска.
+    """
     bot_token: str
     admin_ids: tuple[int, ...]
     main_channel_id: int

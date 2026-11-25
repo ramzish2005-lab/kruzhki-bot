@@ -110,6 +110,7 @@ async def cmd_admin(message: Message, cfg: Config, db: Database) -> None:
     user = await db.get_user(message.from_user.id)
     await message.answer(
         "Админ-команды:\n"
+        "/settings — ⚙️ лимиты и цены (меняются сразу)\n"
         "/stats — статистика\n"
         "/pending — сколько на модерации\n"
         "/give <user_id> <views> — начислить просмотры\n"

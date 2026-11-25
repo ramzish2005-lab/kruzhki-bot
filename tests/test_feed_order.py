@@ -13,7 +13,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from aiogram import Bot  # noqa: E402
 from aiogram.types import Chat, Message, User as TgUser  # noqa: E402
 
-from bot.config import Config, Sponsor  # noqa: E402
+from bot.config import Config  # noqa: E402
 from bot.db import Database  # noqa: E402
 from bot.services.feed import show_next  # noqa: E402
 from tests.test_flow import FakeSession  # noqa: E402

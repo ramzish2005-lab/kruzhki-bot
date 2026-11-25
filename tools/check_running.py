@@ -1,7 +1,7 @@
-"""Проверяет, запущен ли бот где-то ещё (Railway) или нет.
+"""Проверка живости бота БЕЗ вмешательства в его работу.
 
-Запуск: python tools/check_running.py
-Безопасно: ничего не удаляет и не меняет.
+Важно: обычный getUpdates «угоняет» апдейты у рабочего бота и вызывает
+TelegramConflictError. Поэтому здесь только getMe — безопасная проверка.
 """
 
 from __future__ import annotations
@@ -14,7 +14,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(BASE_DIR))
 
 from aiogram import Bot  # noqa: E402
-from aiogram.exceptions import TelegramConflictError, TelegramUnauthorizedError  # noqa: E402
+from aiogram.exceptions import TelegramUnauthorizedError  # noqa: E402
 
 from setup_env import current_value, load_lines  # noqa: E402
 
@@ -29,32 +29,20 @@ async def main() -> int:
     try:
         me = await bot.get_me()
         print(f"✅ Токен рабочий: @{me.username} (id {me.id})")
+        print(f"   Имя бота: {me.first_name}")
     except TelegramUnauthorizedError:
-        print("❌ Токен НЕ работает (отозван или опечатка). Возьми новый у @BotFather.")
-        await bot.session.close()
+        print("❌ Токен отозван. Возьми новый у @BotFather и запусти tools/set_token.py")
         return 1
-    finally:
-        pass
-
-    try:
-        # Если бот уже кем-то опрашивается (Railway), Telegram ответит 409.
-        await bot.get_updates(timeout=0, limit=1)
-        print("⚠️  Бот НЕ запущен ни на одном сервере (никто не опрашивает Telegram).")
-        print("   → Значит на Railway он упал. Смотри Deploy Logs.")
-        running = False
-    except TelegramConflictError:
-        print("✅ Бот РАБОТАЕТ на сервере (Railway) — он сейчас опрашивает Telegram.")
-        running = True
     except Exception as exc:  # noqa: BLE001
-        print(f"⚠️  Не удалось проверить: {exc}")
-        running = False
+        print(f"❌ Не удалось проверить токен: {exc}")
+        return 1
     finally:
         await bot.session.close()
 
     print()
-    if running:
-        print("Всё хорошо. Напиши боту /start в Telegram.")
-    return 0 if running else 1
+    print("Этот скрипт не мешает работе бота.")
+    print("Чтобы проверить, что бот отвечает — напиши ему /start в Telegram.")
+    return 0
 
 
 if __name__ == "__main__":

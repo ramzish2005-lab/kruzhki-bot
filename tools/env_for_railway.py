@@ -18,6 +18,8 @@ from setup_env import current_value, load_lines  # noqa: E402
 RAILWAY_EXTRA = {
     "DATA_DIR": "/data",
     "DB_PATH": "bot.db",
+    # Railpack читает версию Python отсюда надёжнее, чем из .python-version.
+    "RAILPACK_PYTHON_VERSION": "3.12",
 }
 
 

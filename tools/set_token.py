@@ -12,6 +12,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(BASE_DIR))
 
 from setup_env import ENV_PATH, load_lines, set_value  # noqa: E402
+from tools.env_for_railway import RAILWAY_EXTRA  # noqa: E402
 
 RAILWAY_KEYS = [
     "BOT_TOKEN",
@@ -63,7 +64,10 @@ def main() -> int:
                 values[key] = value.strip()
 
     block = [f"{key}={value}" for key, value in values.items()]
-    block += ["DATA_DIR=/data", "DB_PATH=bot.db"]
+    block += [
+        f"{key}={value}"
+        for key, value in RAILWAY_EXTRA.items()
+    ]
     text = "\n".join(block)
 
     out_file = BASE_DIR / "railway_vars.txt"

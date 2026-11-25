@@ -88,7 +88,7 @@ def main() -> int:
             print(f"{OK} .env в git не попадёт")
 
     # 5. Railway-конфиги
-    for name in ("railway.json", "nixpacks.toml", "requirements.txt"):
+    for name in ("railway.json", ".python-version", "requirements.txt"):
         if (BASE_DIR / name).exists():
             print(f"{OK} {name} на месте")
         else:

@@ -31,7 +31,10 @@ CREATE TABLE IF NOT EXISTS users (
     total_views      INTEGER NOT NULL DEFAULT 0,
     submitted        INTEGER NOT NULL DEFAULT 0,
     approved         INTEGER NOT NULL DEFAULT 0,
-    blocked          INTEGER NOT NULL DEFAULT 0
+    blocked          INTEGER NOT NULL DEFAULT 0,
+    ref_code         TEXT,
+    referred_by      INTEGER,
+    referrals        INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS videos (
@@ -90,6 +93,13 @@ CREATE TABLE IF NOT EXISTS settings (
     updated_at TEXT NOT NULL,
     updated_by INTEGER
 );
+
+CREATE TABLE IF NOT EXISTS referral_rewards (
+    invitee_id  INTEGER PRIMARY KEY,
+    referrer_id INTEGER NOT NULL,
+    views       INTEGER NOT NULL,
+    created_at  TEXT NOT NULL
+);
 """
 
 
@@ -118,6 +128,9 @@ class User:
     submitted: int
     approved: int
     blocked: bool
+    ref_code: str | None = None
+    referred_by: int | None = None
+    referrals: int = 0
 
     @property
     def display_name(self) -> str:
@@ -150,7 +163,8 @@ class Stats:
 
 _USER_COLUMNS = (
     "user_id, username, first_name, balance, free_granted, bonus_granted, "
-    "main_sub_ok, total_views, submitted, approved, blocked"
+    "main_sub_ok, total_views, submitted, approved, blocked, "
+    "ref_code, referred_by, referrals"
 )
 
 
@@ -167,6 +181,9 @@ def _row_to_user(row: aiosqlite.Row) -> User:
         submitted=row["submitted"],
         approved=row["approved"],
         blocked=bool(row["blocked"]),
+        ref_code=row["ref_code"],
+        referred_by=row["referred_by"],
+        referrals=row["referrals"] or 0,
     )
 
 
@@ -184,7 +201,22 @@ class Database:
         self._conn.row_factory = aiosqlite.Row
         await self._conn.execute("PRAGMA journal_mode=WAL")
         await self._conn.executescript(SCHEMA)
+        await self._migrate()
         await self._conn.commit()
+
+    async def _migrate(self) -> None:
+        """Досоздаёт колонки, если база старше текущей схемы."""
+        async with self.conn.execute("PRAGMA table_info(users)") as cur:
+            existing = {row["name"] for row in await cur.fetchall()}
+
+        new_columns = {
+            "ref_code": "TEXT",
+            "referred_by": "INTEGER",
+            "referrals": "INTEGER NOT NULL DEFAULT 0",
+        }
+        for name, ddl in new_columns.items():
+            if name not in existing:
+                await self.conn.execute(f"ALTER TABLE users ADD COLUMN {name} {ddl}")
 
     async def close(self) -> None:
         if self._conn is not None:
@@ -268,6 +300,83 @@ class Database:
         )
         await self.conn.commit()
         return cur.rowcount > 0
+
+    async def ensure_ref_code(self, user_id: int) -> str:
+        """Выдаёт пользователю личный реферальный код (если ещё нет)."""
+        user = await self.get_user(user_id)
+        if user and user.ref_code:
+            return user.ref_code
+
+        code = new_public_id()
+        # Код должен быть уникальным: повторяем при совпадении.
+        for _ in range(5):
+            async with self.conn.execute(
+                "SELECT 1 FROM users WHERE ref_code = ?", (code,)
+            ) as cur:
+                taken = await cur.fetchone() is not None
+            if not taken:
+                break
+            code = new_public_id()
+
+        await self.conn.execute(
+            "UPDATE users SET ref_code = ? WHERE user_id = ?", (code, user_id)
+        )
+        await self.conn.commit()
+        return code
+
+    async def find_by_ref_code(self, code: str) -> User | None:
+        async with self.conn.execute(
+            f"SELECT {_USER_COLUMNS} FROM users WHERE ref_code = ?", (code,)
+        ) as cur:
+            row = await cur.fetchone()
+        return _row_to_user(row) if row else None
+
+    async def set_referrer(self, user_id: int, referrer_id: int) -> bool:
+        """Привязывает «кто пригласил». Только один раз и не сам себя."""
+        if user_id == referrer_id:
+            return False
+
+        user = await self.get_user(user_id)
+        if user is None or user.referred_by is not None:
+            return False
+
+        await self.conn.execute(
+            "UPDATE users SET referred_by = ? WHERE user_id = ? AND referred_by IS NULL",
+            (referrer_id, user_id),
+        )
+        await self.conn.commit()
+        return True
+
+    async def reward_referrer(self, invitee_id: int, views: int) -> tuple[int, int] | None:
+        """Начисляет пригласившему просмотры за друга. Строго один раз на друга.
+
+        Возвращает (id пригласившего, всего друзей у него) или None,
+        если награда уже была выдана.
+        """
+        user = await self.get_user(invitee_id)
+        if user is None or user.referred_by is None:
+            return None
+
+        try:
+            # Уникальный индекс по invitee_id не даст наградить дважды.
+            await self.conn.execute(
+                "INSERT INTO referral_rewards (invitee_id, referrer_id, views, created_at) "
+                "VALUES (?, ?, ?, ?)",
+                (invitee_id, user.referred_by, views, iso()),
+            )
+        except aiosqlite.IntegrityError:
+            await self.conn.rollback()
+            return None
+
+        await self.conn.execute(
+            "UPDATE users SET referrals = referrals + 1, balance = balance + ? "
+            "WHERE user_id = ?",
+            (views, user.referred_by),
+        )
+        await self.conn.commit()
+
+        referrer = await self.get_user(user.referred_by)
+        return user.referred_by, (referrer.referrals if referrer else 0)
 
     async def set_blocked(self, user_id: int, blocked: bool) -> None:
         await self.conn.execute(

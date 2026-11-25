@@ -9,7 +9,12 @@ from aiogram.types import CallbackQuery, Message, User as TgUser
 from .. import texts
 from ..config import Config
 from ..db import Database, User
-from ..keyboards import pay_gate, reply_menu, sponsor_gate, sub_gate
+from ..keyboards import (
+    no_views_gate,
+    reply_menu,
+    sponsor_gate,
+    sub_gate,
+)
 from ..services.access import Gate, resolve_gate
 
 
@@ -68,10 +73,14 @@ async def send_gate(
     elif gate is Gate.PAYMENT:
         await bot.send_message(
             chat_id,
-            texts.GATE_PAY_REQUIRED.format(
-                size=cfg.pay_pack_size, price=price_label(cfg)
+            texts.GATE_NO_VIEWS.format(
+                referral=cfg.referral_views,
+                size=cfg.pay_pack_size,
+                price=price_label(cfg),
             ),
-            reply_markup=pay_gate(cfg.pay_pack_size, price_label(cfg)),
+            reply_markup=no_views_gate(
+                cfg.pay_pack_size, price_label(cfg), cfg.referral_views
+            ),
         )
     else:
         await bot.send_message(chat_id, texts.ERROR)
@@ -112,9 +121,10 @@ def status_text(user: User, cfg: Config) -> str:
         f"👤 {user.display_name}\n"
         f"Доступных просмотров: <b>{user.balance}</b>\n"
         f"Всего просмотрено: <b>{user.total_views}</b>\n"
-        f"Отправлено кружков: <b>{user.submitted}</b> (принято: <b>{user.approved}</b>)\n\n"
-        f"Лимит: {cfg.free_views} бесплатных, затем +{cfg.bonus_views} за подписки "
-        f"на каналы-партнёры, далее пакеты по {cfg.pay_pack_size}."
+        f"Отправлено кружков: <b>{user.submitted}</b> (принято: <b>{user.approved}</b>)\n"
+        f"Приглашено друзей: <b>{user.referrals}</b>\n\n"
+        f"Лимит: {cfg.free_views} бесплатных, +{cfg.referral_views} за друга, "
+        f"далее пакеты по {cfg.pay_pack_size}."
     )
 
 

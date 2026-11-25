@@ -21,6 +21,7 @@ from bot.handlers import (
     ingest,
     moderation,
     payments,
+    referrals,
     settings as settings_handler,
     sponsors,
     start,
@@ -63,6 +64,7 @@ def build_dispatcher(cfg: Config, db: Database) -> Dispatcher:
     # Порядок важен: админ/модерация раньше пользовательских хендлеров.
     dp.include_router(admin.router)
     dp.include_router(settings_handler.router)
+    dp.include_router(referrals.router)
     dp.include_router(moderation.router)
     dp.include_router(payments.router)
     dp.include_router(sponsors.router)

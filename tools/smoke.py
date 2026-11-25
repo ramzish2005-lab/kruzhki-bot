@@ -98,7 +98,12 @@ def main() -> None:
         texts.STATUS_NEED_PAY.format(size=10, price="35 ⭐"),
         texts.GATE_SPONSORS_REQUIRED.format(bonus=10, left=3),
         texts.GATE_SPONSORS_NOT_YET.format(left=2),
-        texts.GATE_PAY_REQUIRED.format(size=10, price="50 ₽"),
+        texts.GATE_NO_VIEWS.format(referral=2, size=10, price="50 ₽"),
+        texts.REFERRAL_TEXT.format(
+            views=2, link="https://t.me/b?start=ref_x", count=3, earned=6
+        ),
+        texts.REFERRAL_BONUS.format(views=2, balance=5),
+        texts.REFERRAL_NEW_USER,
         texts.FEED_VIEWS_LEFT.format(views=9),
         texts.SUBMIT_TOO_LONG.format(seconds=60),
         texts.MODERATION_CAPTION.format(author="@u", public_id="abcd1234", user_id=1),

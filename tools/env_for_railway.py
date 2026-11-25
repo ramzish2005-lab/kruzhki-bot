@@ -33,6 +33,8 @@ def main() -> int:
         "SPONSORS",
         "FREE_VIEWS",
         "BONUS_VIEWS",
+        "REFERRAL_VIEWS",
+        "BOT_USERNAME",
         "PAYMENT_MODE",
         "PAY_PACK_SIZE",
         "PAY_PACK_STARS",

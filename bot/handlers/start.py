@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from aiogram import Bot, F, Router
 from aiogram.exceptions import TelegramBadRequest
-from aiogram.filters import Command, CommandStart
+from aiogram.filters import Command, CommandObject, CommandStart
 from aiogram.types import CallbackQuery, Message
 
 from .. import texts
@@ -17,7 +17,9 @@ from .common import ensure_user, menu_for, price_label, status_text
 router = Router(name="start")
 
 
-async def send_start(message: Message, bot: Bot, db: Database, cfg: Config) -> None:
+async def send_start(
+    message: Message, bot: Bot, db: Database, cfg: Config, payload: str | None = None
+) -> None:
     assert message.from_user is not None
     user = await ensure_user(message.from_user, db, cfg)
     name = message.from_user.first_name or "друг"
@@ -25,6 +27,13 @@ async def send_start(message: Message, bot: Bot, db: Database, cfg: Config) -> N
     if user.blocked:
         await message.answer(texts.ERROR)
         return
+
+    # Новый пользователь мог прийти по реферальной ссылке.
+    came_by_ref = False
+    if payload:
+        from .referrals import apply_referral
+
+        came_by_ref = await apply_referral(db, cfg, user.user_id, payload)
 
     # Подписку проверяем при каждом /start, а не только при первом входе:
     # иначе отписавшийся пользователь сохранил бы доступ навсегда.
@@ -39,6 +48,12 @@ async def send_start(message: Message, bot: Bot, db: Database, cfg: Config) -> N
             disable_web_page_preview=True,
         )
         return
+
+    # Друг подписался — начисляем бонус тому, кто его пригласил.
+    from .referrals import reward_if_subscribed
+
+    await reward_if_subscribed(bot, db, cfg, user.user_id)
+
     user = await db.get_user(user.user_id) or user
 
     if user.balance > 0:
@@ -50,16 +65,27 @@ async def send_start(message: Message, bot: Bot, db: Database, cfg: Config) -> N
             size=cfg.pay_pack_size, price=price_label(cfg)
         )
 
-    await message.answer(
-        texts.START.format(name=name, status=status),
-        reply_markup=menu_for(user, cfg),
-    )
+    answer = texts.START.format(name=name, status=status)
+
+    if came_by_ref:
+        from .referrals import make_link
+
+        link = await make_link(db, cfg, user.user_id)
+        answer += (
+            "\n\n"
+            f"{texts.REFERRAL_NEW_USER}\n\n"
+            f"👥 Твоя ссылка:\n<code>{link}</code>"
+        )
+
+    await message.answer(answer, reply_markup=menu_for(user, cfg))
     await message.answer("Выбери действие 👇", reply_markup=main_menu())
 
 
 @router.message(CommandStart())
-async def cmd_start(message: Message, bot: Bot, db: Database, cfg: Config) -> None:
-    await send_start(message, bot, db, cfg)
+async def cmd_start(
+    message: Message, bot: Bot, db: Database, cfg: Config, command: CommandObject
+) -> None:
+    await send_start(message, bot, db, cfg, payload=command.args)
 
 
 @router.message(Command("menu"))
@@ -93,6 +119,12 @@ async def cb_check_main(call: CallbackQuery, bot: Bot, db: Database, cfg: Config
         return
 
     await call.answer("Подписка подтверждена ✅")
+
+    # Если пользователь пришёл по ссылке — начисляем бонус пригласившему.
+    from .referrals import reward_if_subscribed
+
+    await reward_if_subscribed(bot, db, cfg, user.user_id)
+
     user = await db.get_user(user.user_id) or user
     if call.message:
         text = (

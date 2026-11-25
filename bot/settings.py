@@ -51,6 +51,14 @@ SETTINGS: tuple[Setting, ...] = (
         hint="Просмотры за подписку на каналы-партнёры (0 — отключить)",
     ),
     Setting(
+        key="REFERRAL_VIEWS",
+        attr="referral_views",
+        label="Просмотров за друга",
+        kind="int",
+        maximum=10_000,
+        hint="Сколько получает пригласивший, когда друг подпишется на канал",
+    ),
+    Setting(
         key="PAY_PACK_SIZE",
         attr="pay_pack_size",
         label="Просмотров в пакете",

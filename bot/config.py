@@ -48,6 +48,8 @@ class Config:
     db_path: Path
     feed_include_own: bool
     source_channel_id: int | None = None
+    referral_views: int = 2
+    bot_username: str = ""
 
     def is_admin(self, user_id: int) -> bool:
         return user_id in self.admin_ids
@@ -154,4 +156,6 @@ def load_config() -> Config:
         db_path=db_path,
         feed_include_own=(_env("FEED_INCLUDE_OWN") or "0") in ("1", "true", "yes"),
         source_channel_id=int(source_raw) if source_raw else None,
+        referral_views=_int("REFERRAL_VIEWS", 2),
+        bot_username=(_env("BOT_USERNAME") or "").lstrip("@"),
     )

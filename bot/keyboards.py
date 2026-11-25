@@ -13,7 +13,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 
 class MenuCB(CallbackData, prefix="menu"):
-    action: str  # feed | submit | status | help
+    action: str  # feed | submit | status | help | refs
 
 
 class CheckSubCB(CallbackData, prefix="sub"):
@@ -47,8 +47,9 @@ def main_menu() -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     builder.button(text="▶️ Смотреть кружки", callback_data=MenuCB(action="feed"))
     builder.button(text="📤 Отправить кружок", callback_data=MenuCB(action="submit"))
+    builder.button(text="👥 Пригласить друга", callback_data=MenuCB(action="refs"))
     builder.button(text="📊 Мои просмотры", callback_data=MenuCB(action="status"))
-    builder.adjust(2, 1)
+    builder.adjust(2, 1, 1)
     return builder.as_markup()
 
 
@@ -56,6 +57,7 @@ def reply_menu(is_admin: bool = False) -> ReplyKeyboardMarkup:
     rows = [
         [KeyboardButton(text="▶️ Смотреть кружки")],
         [KeyboardButton(text="📤 Отправить кружок"), KeyboardButton(text="📊 Мои просмотры")],
+        [KeyboardButton(text="👥 Пригласить друга")],
     ]
     if is_admin:
         rows.append([KeyboardButton(text="⚙️ Настройки")])
@@ -94,6 +96,24 @@ def sponsor_gate(sponsors: list[tuple[str, str]], bonus: int) -> InlineKeyboardM
 
 def pay_gate(size: int, price_label: str) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
+    builder.row(
+        InlineKeyboardButton(
+            text=f"💳 Купить {size} просмотров — {price_label}",
+            callback_data=PayCB(size=size).pack(),
+        )
+    )
+    return builder.as_markup()
+
+
+def no_views_gate(size: int, price_label: str, referral_views: int) -> InlineKeyboardMarkup:
+    """Когда просмотры кончились: рефералка или покупка."""
+    builder = InlineKeyboardBuilder()
+    builder.row(
+        InlineKeyboardButton(
+            text=f"👥 Пригласить друга (+{referral_views} бесплатно)",
+            callback_data=MenuCB(action="refs").pack(),
+        )
+    )
     builder.row(
         InlineKeyboardButton(
             text=f"💳 Купить {size} просмотров — {price_label}",

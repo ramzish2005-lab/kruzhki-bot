@@ -1,0 +1,25 @@
+# В образ не должны попадать секреты и локальные артефакты.
+.venv/
+__pycache__/
+*.py[cod]
+.ruff_cache/
+
+# Секреты — только через переменные окружения хостинга.
+.env
+railway_vars.txt
+*.session
+
+# Локальная база и данные: в контейнере используется volume /data.
+data/
+*.db
+*.db-wal
+*.db-shm
+inbox/
+
+# Не нужны в рантайме.
+tests/
+tools/
+.git/
+.gitignore
+*.bat
+README.md

@@ -146,5 +146,64 @@ class PushTestCase(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.sent_notes, [])
 
 
+class TestPushSchedule(unittest.IsolatedAsyncioTestCase):
+    """Расписание не сбрасывается при перезапуске бота."""
+
+    async def asyncSetUp(self) -> None:
+        self._tmp = tempfile.TemporaryDirectory()
+        self.db = Database(Path(self._tmp.name) / "sched.db")
+        await self.db.connect()
+        self.cfg = make_config(Path(self._tmp.name) / "sched.db")
+
+    async def asyncTearDown(self) -> None:
+        await self.db.close()
+        self._tmp.cleanup()
+
+    async def test_first_push_soon_after_start(self):
+        from bot.services.push import FIRST_PUSH_DELAY, seconds_until_next
+
+        self.assertEqual(await seconds_until_next(self.db, self.cfg), FIRST_PUSH_DELAY)
+
+    async def test_waits_full_interval_after_push(self):
+        from bot.db import iso
+        from bot.services.push import LAST_PUSH_KEY, seconds_until_next
+
+        await self.db.set_setting(LAST_PUSH_KEY, iso())
+        delay = await seconds_until_next(self.db, self.cfg)
+
+        # Сразу после отправки ждём почти весь интервал (3 часа).
+        self.assertGreater(delay, 3 * 3600 - 10)
+        self.assertLessEqual(delay, 3 * 3600)
+
+    async def test_old_timestamp_means_send_now(self):
+        from datetime import datetime, timedelta, timezone
+
+        from bot.services.push import LAST_PUSH_KEY, seconds_until_next
+
+        four_hours_ago = datetime.now(timezone.utc) - timedelta(hours=4)
+        await self.db.set_setting(LAST_PUSH_KEY, four_hours_ago.isoformat())
+
+        self.assertEqual(await seconds_until_next(self.db, self.cfg), 0)
+
+    async def test_interval_follows_setting(self):
+        from datetime import datetime, timedelta, timezone
+
+        from bot.services.push import LAST_PUSH_KEY, seconds_until_next
+
+        self.cfg.notify_hours = 1
+        hour_ago = datetime.now(timezone.utc) - timedelta(minutes=30)
+        await self.db.set_setting(LAST_PUSH_KEY, hour_ago.isoformat())
+
+        delay = await seconds_until_next(self.db, self.cfg)
+        self.assertGreater(delay, 25 * 60)
+        self.assertLessEqual(delay, 30 * 60 + 5)
+
+    async def test_broken_timestamp_falls_back(self):
+        from bot.services.push import FIRST_PUSH_DELAY, LAST_PUSH_KEY, seconds_until_next
+
+        await self.db.set_setting(LAST_PUSH_KEY, "не дата")
+        self.assertEqual(await seconds_until_next(self.db, self.cfg), FIRST_PUSH_DELAY)
+
+
 if __name__ == "__main__":
     unittest.main()

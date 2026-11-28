@@ -2,6 +2,9 @@
 
 Каждое сообщение содержит кнопку: по нажатию пользователь получает
 ровно один кружок бесплатно (одна выдача на одно сообщение).
+
+Расписание хранится в базе (ключ last_push_at), поэтому перезапуск бота
+не сбрасывает таймер: следующая волна придёт в срок.
 """
 
 from __future__ import annotations
@@ -9,19 +12,49 @@ from __future__ import annotations
 import asyncio
 import logging
 import random
+from datetime import datetime, timezone
 
 from aiogram import Bot
 from aiogram.exceptions import TelegramForbiddenError, TelegramRetryAfter
 
 from .. import texts
 from ..config import Config
-from ..db import Database
+from ..db import Database, iso
 from ..keyboards import push_kb
 
 log = logging.getLogger(__name__)
 
 # Пауза между сообщениями, чтобы не поймать flood limit от Telegram.
 SEND_DELAY = 0.05
+
+# Ключ в таблице settings: когда последний раз рассылали.
+LAST_PUSH_KEY = "last_push_at"
+
+# Первая рассылка после самого первого запуска (если ещё ни разу не слали).
+FIRST_PUSH_DELAY = 60
+
+
+def _interval_seconds(cfg: Config) -> int:
+    return max(1, cfg.notify_hours) * 3600
+
+
+async def seconds_until_next(db: Database, cfg: Config) -> int:
+    """Сколько ждать до следующей волны с учётом последней отправки."""
+    raw = await db.get_setting(LAST_PUSH_KEY)
+    if not raw:
+        return FIRST_PUSH_DELAY
+
+    try:
+        last = datetime.fromisoformat(raw)
+    except ValueError:
+        return FIRST_PUSH_DELAY
+
+    if last.tzinfo is None:
+        last = last.replace(tzinfo=timezone.utc)
+
+    elapsed = (datetime.now(timezone.utc) - last).total_seconds()
+    remaining = _interval_seconds(cfg) - elapsed
+    return max(0, int(remaining))
 
 
 async def notify_user(bot: Bot, db: Database, cfg: Config, user_id: int) -> bool:
@@ -69,14 +102,20 @@ async def send_wave(bot: Bot, db: Database, cfg: Config, limit: int = 500) -> in
 
 
 async def notification_loop(bot: Bot, db: Database, cfg: Config) -> None:
-    """Фоновый цикл: спит N часов, затем рассылает напоминания."""
-    interval = max(1, cfg.notify_hours) * 3600
-    log.info("Напоминания включены: каждые %s ч", cfg.notify_hours)
+    """Фоновый цикл: ждёт по расписанию и рассылает напоминания."""
+    log.info(
+        "Напоминания включены: каждые %s ч (первая — %s сек)",
+        cfg.notify_hours,
+        await seconds_until_next(db, cfg),
+    )
 
     while True:
         try:
-            await asyncio.sleep(interval)
+            delay = await seconds_until_next(db, cfg)
+            await asyncio.sleep(delay)
+
             await send_wave(bot, db, cfg)
+            await db.set_setting(LAST_PUSH_KEY, iso())
         except asyncio.CancelledError:
             log.info("Цикл напоминаний остановлен")
             raise

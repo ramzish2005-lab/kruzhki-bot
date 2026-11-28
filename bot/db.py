@@ -100,6 +100,20 @@ CREATE TABLE IF NOT EXISTS referral_rewards (
     views       INTEGER NOT NULL,
     created_at  TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS push_notifications (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id    INTEGER NOT NULL,
+    text_key   TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS free_grants (
+    user_id         INTEGER NOT NULL,
+    notification_id INTEGER NOT NULL,
+    created_at      TEXT NOT NULL,
+    PRIMARY KEY (user_id, notification_id)
+);
 """
 
 
@@ -592,6 +606,63 @@ class Database:
     async def delete_setting(self, key: str) -> None:
         await self.conn.execute("DELETE FROM settings WHERE key = ?", (key,))
         await self.conn.commit()
+
+    # ------------------------------------------------------------------ push
+
+    async def push_recipients(self, limit: int = 500) -> list[User]:
+        """Кому можно писать: не заблокированные, кто заходил в бота."""
+        async with self.conn.execute(
+            f"SELECT {_USER_COLUMNS} FROM users "
+            "WHERE blocked = 0 ORDER BY last_seen_at DESC LIMIT ?",
+            (limit,),
+        ) as cur:
+            rows = await cur.fetchall()
+        return [_row_to_user(row) for row in rows]
+
+    async def unseen_count(self, user_id: int, include_own: bool = False) -> int:
+        """Сколько опубликованных кружков пользователь ещё не видел."""
+        own_filter = "" if include_own else "AND v.author_id != ?"
+        params: list[object] = [user_id]
+        if not include_own:
+            params.append(user_id)
+        async with self.conn.execute(
+            "SELECT COUNT(*) AS c FROM videos v "
+            "LEFT JOIN seen s ON s.video_id = v.id AND s.user_id = ? "
+            f"WHERE v.status = 'published' AND s.video_id IS NULL {own_filter}",
+            tuple(params),
+        ) as cur:
+            row = await cur.fetchone()
+        return int(row["c"]) if row else 0
+
+    async def create_notification(self, user_id: int, text_key: str) -> int:
+        cur = await self.conn.execute(
+            "INSERT INTO push_notifications (user_id, text_key, created_at) "
+            "VALUES (?, ?, ?)",
+            (user_id, text_key, iso()),
+        )
+        await self.conn.commit()
+        return int(cur.lastrowid or 0)
+
+    async def claim_notification(self, user_id: int, notification_id: int) -> bool:
+        """Отмечает кнопку нажатой. False — уже использовалась."""
+        try:
+            await self.conn.execute(
+                "INSERT INTO free_grants (user_id, notification_id, created_at) "
+                "VALUES (?, ?, ?)",
+                (user_id, notification_id, iso()),
+            )
+        except aiosqlite.IntegrityError:
+            await self.conn.rollback()
+            return False
+        await self.conn.commit()
+        return True
+
+    async def notification_owner(self, notification_id: int) -> int | None:
+        async with self.conn.execute(
+            "SELECT user_id FROM push_notifications WHERE id = ?", (notification_id,)
+        ) as cur:
+            row = await cur.fetchone()
+        return int(row["user_id"]) if row else None
 
     # ------------------------------------------------------------------ stats
 

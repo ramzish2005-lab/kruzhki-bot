@@ -50,6 +50,7 @@ class Config:
     source_channel_id: int | None = None
     referral_views: int = 2
     bot_username: str = ""
+    notify_hours: int = 3
 
     def is_admin(self, user_id: int) -> bool:
         return user_id in self.admin_ids
@@ -158,4 +159,5 @@ def load_config() -> Config:
         source_channel_id=int(source_raw) if source_raw else None,
         referral_views=_int("REFERRAL_VIEWS", 2),
         bot_username=(_env("BOT_USERNAME") or "").lstrip("@"),
+        notify_hours=_int("NOTIFY_HOURS", 3),
     )

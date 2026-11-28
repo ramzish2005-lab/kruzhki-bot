@@ -21,12 +21,14 @@ from bot.handlers import (
     ingest,
     moderation,
     payments,
+    push as push_handler,
     referrals,
     settings as settings_handler,
     sponsors,
     start,
     submit,
 )
+from bot.services.push import notification_loop
 from bot.settings import load_settings
 
 log = logging.getLogger(__name__)
@@ -65,6 +67,7 @@ def build_dispatcher(cfg: Config, db: Database) -> Dispatcher:
     dp.include_router(admin.router)
     dp.include_router(settings_handler.router)
     dp.include_router(referrals.router)
+    dp.include_router(push_handler.router)
     dp.include_router(moderation.router)
     dp.include_router(payments.router)
     dp.include_router(sponsors.router)
@@ -140,7 +143,20 @@ async def main() -> None:
         log.info("Бот запущен: @%s", me.username)
         await check_bot_rights(bot, cfg)
         await bot.delete_webhook(drop_pending_updates=True)
-        await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())
+
+        # Фоновый цикл напоминаний: бот сам пишет пользователям.
+        push_task = asyncio.create_task(notification_loop(bot, db, cfg))
+
+        try:
+            await dp.start_polling(
+                bot, allowed_updates=dp.resolve_used_update_types()
+            )
+        finally:
+            push_task.cancel()
+            try:
+                await push_task
+            except asyncio.CancelledError:
+                pass
     finally:
         await db.close()
         await bot.session.close()

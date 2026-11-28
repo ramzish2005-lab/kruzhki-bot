@@ -37,6 +37,7 @@ def main() -> int:
         "BONUS_VIEWS",
         "REFERRAL_VIEWS",
         "BOT_USERNAME",
+        "NOTIFY_HOURS",
         "PAYMENT_MODE",
         "PAY_PACK_SIZE",
         "PAY_PACK_STARS",

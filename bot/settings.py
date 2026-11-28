@@ -86,6 +86,15 @@ SETTINGS: tuple[Setting, ...] = (
         hint="Используется только в режиме provider",
     ),
     Setting(
+        key="NOTIFY_HOURS",
+        attr="notify_hours",
+        label="Часов между напоминаниями",
+        kind="int",
+        minimum=1,
+        maximum=168,
+        hint="Раз в сколько часов бот сам пишет пользователям",
+    ),
+    Setting(
         key="FEED_INCLUDE_OWN",
         attr="feed_include_own",
         label="Показывать свои кружки",

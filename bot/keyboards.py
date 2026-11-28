@@ -11,6 +11,8 @@ from aiogram.types import (
 )
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
+from . import texts
+
 
 class MenuCB(CallbackData, prefix="menu"):
     action: str  # feed | submit | status | help | refs
@@ -37,6 +39,10 @@ class PayCB(CallbackData, prefix="pay"):
 class SettingsCB(CallbackData, prefix="set"):
     action: str  # edit | reset | close
     key: str = ""
+
+
+class PushCB(CallbackData, prefix="push"):
+    notification_id: int
 
 
 class SponsorCB(CallbackData, prefix="sponsor"):
@@ -165,6 +171,16 @@ def referral_kb(link: str) -> InlineKeyboardMarkup:
 def back_to_menu() -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     builder.button(text="⬅️ В меню", callback_data=MenuCB(action="status").pack())
+    return builder.as_markup()
+
+
+def push_kb(notification_id: int) -> InlineKeyboardMarkup:
+    """Кнопка под напоминанием: открыть один кружок бесплатно."""
+    builder = InlineKeyboardBuilder()
+    builder.button(
+        text=texts.PUSH_BUTTON,
+        callback_data=PushCB(notification_id=notification_id).pack(),
+    )
     return builder.as_markup()
 
 

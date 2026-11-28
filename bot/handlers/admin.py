@@ -101,6 +101,40 @@ async def cmd_pending(message: Message, cfg: Config, db: Database) -> None:
     await message.answer(f"Кружков на модерации: <b>{pending}</b>")
 
 
+@router.message(Command("push_test"))
+async def cmd_push_test(message: Message, cfg: Config, db: Database, bot: Bot) -> None:
+    """Отправляет напоминание только тебе — для проверки текста и кнопки."""
+    if not _admin_only(message, cfg):
+        await message.answer(texts.ADMIN_ONLY)
+        return
+
+    assert message.from_user is not None
+    from ..services.push import notify_user
+
+    sent = await notify_user(bot, db, cfg, message.from_user.id)
+    if sent:
+        await message.answer("✅ Напоминание отправлено (смотри выше).")
+    else:
+        await message.answer(
+            "⚠️ Не отправилось: возможно, в ленте нет кружков, "
+            "которые ты ещё не видел. Добавь кружок в канал и попробуй снова."
+        )
+
+
+@router.message(Command("push_all"))
+async def cmd_push_all(message: Message, cfg: Config, db: Database, bot: Bot) -> None:
+    """Разовая рассылка всем (то же, что делает цикл каждые N часов)."""
+    if not _admin_only(message, cfg):
+        await message.answer(texts.ADMIN_ONLY)
+        return
+
+    from ..services.push import send_wave
+
+    await message.answer("📤 Рассылаю напоминания…")
+    sent = await send_wave(bot, db, cfg)
+    await message.answer(f"✅ Доставлено: <b>{sent}</b>")
+
+
 @router.message(Command("admin"))
 async def cmd_admin(message: Message, cfg: Config, db: Database) -> None:
     if not _admin_only(message, cfg):

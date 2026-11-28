@@ -48,9 +48,40 @@ class TestReferralCodes(unittest.IsolatedAsyncioTestCase):
         link = build_link(cfg, "abc123")
         self.assertEqual(link, "https://t.me/krughbot?start=ref_abc123")
 
-    async def test_link_without_username_shows_code(self):
-        link = build_link(self.cfg, "abc123")
-        self.assertIn("BOT_USERNAME", link)
+    async def test_link_accepts_username_argument(self):
+        cfg = make_config(bot_username="")
+        link = build_link(cfg, "abc123", "krughbot")
+        self.assertEqual(link, "https://t.me/krughbot?start=ref_abc123")
+
+    async def test_link_without_username_is_still_valid_url(self):
+        cfg = make_config(bot_username="")
+        link = build_link(cfg, "abc123")
+        self.assertTrue(link.startswith("https://t.me/"))
+        self.assertIn("ref_abc123", link)
+        self.assertNotIn("укажи", link)
+
+    async def test_username_is_resolved_and_cached(self):
+        from bot.services.identity import bot_username
+
+        cfg = make_config(bot_username="")
+
+        class Me:
+            username = "krughbot"
+
+        class FakeBot:
+            calls = 0
+
+            async def get_me(self):
+                FakeBot.calls += 1
+                return Me()
+
+        first = await bot_username(FakeBot(), cfg)
+        second = await bot_username(FakeBot(), cfg)
+
+        self.assertEqual(first, "krughbot")
+        self.assertEqual(second, "krughbot")
+        self.assertEqual(FakeBot.calls, 1, "getMe должен вызываться один раз")
+        self.assertEqual(cfg.bot_username, "krughbot")
 
     async def test_apply_referral_links_users(self):
         await self.make_user(1)

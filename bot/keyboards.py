@@ -144,6 +144,24 @@ def moderation_kb(item_id: int) -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 
+def referral_kb(link: str) -> InlineKeyboardMarkup:
+    """Под реферальным экраном: поделиться ссылкой или вернуться в меню."""
+    builder = InlineKeyboardBuilder()
+    share_text = "Смотри+кружки+в+этом+боте+—+заходи+по+моей+ссылке"
+    builder.row(
+        InlineKeyboardButton(
+            text="📤 Поделиться ссылкой",
+            url=f"https://t.me/share/url?url={link}&text={share_text}",
+        )
+    )
+    builder.row(
+        InlineKeyboardButton(
+            text="◀️ В меню", callback_data=MenuCB(action="status").pack()
+        )
+    )
+    return builder.as_markup()
+
+
 def back_to_menu() -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     builder.button(text="⬅️ В меню", callback_data=MenuCB(action="status").pack())

@@ -17,9 +17,10 @@ from aiogram.types import CallbackQuery, Message
 from .. import texts
 from ..config import Config
 from ..db import Database, User
-from ..keyboards import MenuCB, main_menu
+from ..keyboards import MenuCB, referral_kb
 from ..services.access import check_main_subscription
-from .common import ensure_user, menu_for
+from ..services.identity import bot_username
+from .common import ensure_user
 
 router = Router(name="referrals")
 log = logging.getLogger(__name__)
@@ -27,10 +28,12 @@ log = logging.getLogger(__name__)
 REF_PREFIX = "ref_"
 
 
-def build_link(cfg: Config, code: str) -> str:
-    if cfg.bot_username:
-        return f"https://t.me/{cfg.bot_username}?start={REF_PREFIX}{code}"
-    return f"<code>{REF_PREFIX}{code}</code> (укажи BOT_USERNAME в .env)"
+def build_link(cfg: Config, code: str, username: str = "") -> str:
+    """Собирает ссылку. Без username возвращает только код (запасной вариант)."""
+    name = (username or cfg.bot_username or "").lstrip("@")
+    if name:
+        return f"https://t.me/{name}?start={REF_PREFIX}{code}"
+    return f"https://t.me/?start={REF_PREFIX}{code}"
 
 
 def referral_text(user: User, cfg: Config, link: str) -> str:
@@ -42,9 +45,10 @@ def referral_text(user: User, cfg: Config, link: str) -> str:
     )
 
 
-async def make_link(db: Database, cfg: Config, user_id: int) -> str:
+async def make_link(bot: Bot, db: Database, cfg: Config, user_id: int) -> str:
     code = await db.ensure_ref_code(user_id)
-    return build_link(cfg, code)
+    username = await bot_username(bot, cfg)
+    return build_link(cfg, code, username)
 
 
 async def apply_referral(db: Database, cfg: Config, user_id: int, payload: str) -> bool:
@@ -103,19 +107,27 @@ async def reward_if_subscribed(
 
 
 @router.message(F.text == "👥 Пригласить друга")
-async def cmd_referrals(message: Message, db: Database, cfg: Config) -> None:
+async def cmd_referrals(message: Message, bot: Bot, db: Database, cfg: Config) -> None:
     assert message.from_user is not None
     user = await ensure_user(message.from_user, db, cfg)
-    link = await make_link(db, cfg, user.user_id)
-    await message.answer(referral_text(user, cfg, link), reply_markup=menu_for(user, cfg))
+    link = await make_link(bot, db, cfg, user.user_id)
+    await message.answer(
+        referral_text(user, cfg, link),
+        reply_markup=referral_kb(link),
+        disable_web_page_preview=True,
+    )
 
 
 @router.callback_query(MenuCB.filter(F.action == "refs"))
-async def cb_referrals(call: CallbackQuery, db: Database, cfg: Config) -> None:
+async def cb_referrals(
+    call: CallbackQuery, bot: Bot, db: Database, cfg: Config
+) -> None:
     user = await ensure_user(call.from_user, db, cfg)
-    link = await make_link(db, cfg, user.user_id)
+    link = await make_link(bot, db, cfg, user.user_id)
     await call.answer()
     if call.message:
         await call.message.answer(
-            referral_text(user, cfg, link), reply_markup=main_menu()
+            referral_text(user, cfg, link),
+            reply_markup=referral_kb(link),
+            disable_web_page_preview=True,
         )

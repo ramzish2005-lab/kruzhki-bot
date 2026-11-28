@@ -93,7 +93,9 @@ def main() -> None:
 
     # 4. Тексты форматируются без KeyError.
     formatted = [
-        texts.START.format(name="Тест", status=texts.STATUS_OK.format(views=10)),
+        texts.START.format(
+            name="Тест", referral=2, status=texts.STATUS_OK.format(views=10)
+        ),
         texts.STATUS_NEED_SPONSORS.format(bonus=10),
         texts.STATUS_NEED_PAY.format(size=10, price="35 ⭐"),
         texts.GATE_SPONSORS_REQUIRED.format(bonus=10, left=3),

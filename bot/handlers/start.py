@@ -42,6 +42,7 @@ async def send_start(
         await message.answer(
             texts.START.format(
                 name=name,
+                referral=cfg.referral_views,
                 status=texts.STATUS_NEED_SUB,
             ),
             reply_markup=sub_gate(cfg.main_channel_url),
@@ -65,12 +66,14 @@ async def send_start(
             size=cfg.pay_pack_size, price=price_label(cfg)
         )
 
-    answer = texts.START.format(name=name, status=status)
+    answer = texts.START.format(
+        name=name, referral=cfg.referral_views, status=status
+    )
 
     if came_by_ref:
         from .referrals import make_link
 
-        link = await make_link(db, cfg, user.user_id)
+        link = await make_link(bot, db, cfg, user.user_id)
         answer += (
             "\n\n"
             f"{texts.REFERRAL_NEW_USER}\n\n"

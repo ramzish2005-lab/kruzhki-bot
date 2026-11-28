@@ -66,13 +66,17 @@ async def require_access_callback(
 
 def status_text(user: User, cfg: Config) -> str:
     return (
-        f"👤 {user.display_name}\n"
-        f"Доступных просмотров: <b>{user.balance}</b>\n"
-        f"Всего просмотрено: <b>{user.total_views}</b>\n"
-        f"Отправлено кружков: <b>{user.submitted}</b> (принято: <b>{user.approved}</b>)\n"
-        f"Приглашено друзей: <b>{user.referrals}</b>\n\n"
-        f"Лимит: {cfg.free_views} бесплатных, +{cfg.referral_views} за друга, "
-        f"далее пакеты по {cfg.pay_pack_size}."
+        "👤 <b>Мой профиль</b>\n"
+        "━━━━━━━━━━━━━━\n"
+        f"👁 Доступно просмотров: <b>{user.balance}</b>\n"
+        f"🎬 Просмотрено всего: <b>{user.total_views}</b>\n"
+        f"📤 Отправлено кружков: <b>{user.submitted}</b>\n"
+        f"✅ Принято в ленту: <b>{user.approved}</b>\n"
+        f"👥 Приглашено друзей: <b>{user.referrals}</b>\n"
+        "━━━━━━━━━━━━━━\n"
+        f"<i>{cfg.free_views} бесплатных, "
+        f"+{cfg.referral_views} за друга, "
+        f"пакет {cfg.pay_pack_size} за {price_label(cfg)}</i>"
     )
 
 
